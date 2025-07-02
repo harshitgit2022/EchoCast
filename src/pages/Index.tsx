@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mic, Video, Users, Clock, Play, Zap } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ApiService } from "@/lib/api";
 import Dashboard from './Dashboard';
 import RecordingStudio from './RecordingStudio';
 
@@ -14,11 +16,81 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'recording'>('dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate authentication
-    setIsAuthenticated(true);
+    setIsLoading(true);
+
+    try {
+      const response = await ApiService.login({
+        username: email, // FastAPI uses 'username' field for email
+        password: password
+      });
+
+      // Store the token
+      localStorage.setItem('access_token', response.access_token);
+      localStorage.setItem('token_type', response.token_type);
+
+      // Get user info
+      const user = await ApiService.getCurrentUser();
+      localStorage.setItem('user_email', user.email);
+
+      setIsAuthenticated(true);
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in.",
+      });
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "An error occurred during login",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await ApiService.signup({
+        email: email,
+        password: password
+      });
+
+      toast({
+        title: "Account Created!",
+        description: "Please login with your new account.",
+      });
+
+      // Switch to login tab
+      const loginTab = document.querySelector('[data-value="login"]') as HTMLElement;
+      loginTab?.click();
+    } catch (error) {
+      toast({
+        title: "Signup Failed",
+        description: error instanceof Error ? error.message : "An error occurred during signup",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isAuthenticated) {
@@ -96,12 +168,12 @@ const Index = () => {
             <CardContent>
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">Login</TabsTrigger>
+                  <TabsTrigger value="login" data-value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="login">
-                  <form onSubmit={handleAuth} className="space-y-4">
+                  <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input
@@ -111,6 +183,7 @@ const Index = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -122,23 +195,31 @@ const Index = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        disabled={isLoading}
                       />
                     </div>
-                    <Button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                      Sign In
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Signing In..." : "Sign In"}
                     </Button>
                   </form>
                 </TabsContent>
                 
                 <TabsContent value="signup">
-                  <form onSubmit={handleAuth} className="space-y-4">
+                  <form onSubmit={handleSignup} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <Input
                         id="signup-email"
                         type="email"
                         placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -147,7 +228,10 @@ const Index = () => {
                         id="signup-password"
                         type="password"
                         placeholder="Create a password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -156,11 +240,18 @@ const Index = () => {
                         id="confirm-password"
                         type="password"
                         placeholder="Confirm your password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                         required
+                        disabled={isLoading}
                       />
                     </div>
-                    <Button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                      Create Account
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Creating Account..." : "Create Account"}
                     </Button>
                   </form>
                 </TabsContent>
